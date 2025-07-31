@@ -7,6 +7,7 @@ from database import get_user_data, update_user_data
 class TaiXiu(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.lose_streak = {}  # user_id: số trận thua liên tiếp
 
     @commands.command(name="taixiu")
     @commands.cooldown(rate=1, per=8, type=commands.BucketType.user)
@@ -16,16 +17,20 @@ class TaiXiu(commands.Cog):
 
         if user_data is None:
             return await ctx.send("⚠️ Bạn chưa có tài khoản. Hãy dùng lệnh đăng ký trước!")
-        balance, last_daily, streak, win_rate, luck = user_data
+        balance, last_daily, streak, win_rate, luck, so_ve, hsd, level, exp, invite = user_data
 
         if prize is None:
             return await ctx.send("Bạn phải nhập số tiền cược!")
 
+        original_prize = prize
         if prize.lower() == "all":
-            prize = min(balance, 1000)
+            prize = min(balance, 250000)
+            win_rate = max(0, win_rate - 10)  # Giảm 10% tỉ lệ thắng, không nhỏ hơn 0
         else:
             try:
                 prize = int(prize)
+                if prize > 250000:
+                    prize = 250000
             except ValueError:
                 return await ctx.send("Số tiền cược không hợp lệ!")
 
@@ -41,39 +46,28 @@ class TaiXiu(commands.Cog):
                 color=discord.Color.red()
             ))
 
-        emojis = {"🔴": "tài", "🟢": "xỉu"}
+        emojis = {"🔴": "xỉu", "🟢": "tài"}
 
-        # Bước 1: Gửi thông báo chuẩn bị tung xúc xắc
-        msg1 = await ctx.send(embed=discord.Embed(
-            description="🎲 Chuẩn bị tung xúc xắc...",
-            color=discord.Color.blurple()
-        ))
-        await asyncio.sleep(1.5)
-
-        # Bước 2: Random 1 mặt xúc xắc và show ra
+        # Bước 1: Random 1 con preview
         dice_preview = random.randint(1, 6)
-        dice_str = str(dice_preview)
-        msg2 = await ctx.send(embed=discord.Embed(
-            description=f"🎲 Xúc xắc xuất hiện: {dice_str}",
+        msg1 = await ctx.send(embed=discord.Embed(
+            description=f"🎲 Xúc xắc xuất hiện: {dice_preview}",
             color=discord.Color.blurple()
         ))
         await asyncio.sleep(1.5)
 
-        # Bước 3: Gửi embed chọn tài/xỉu như cũ
+        # Bước 2: Gửi embed chọn tài/xỉu như cũ
         embed = discord.Embed(
             title="🎮 Tài Xỉu - Chọn lựa của bạn",
             description=(
                 f"{ctx.author.mention} đã cược **{prize:,}đ**!\n\n"
                 "Hãy chọn bằng cách react:\n"
-                "🔴 = **Tài**\n"
-                "🟢 = **Xỉu**"
+                "🔴 = **Xỉu**\n"
+                "🟢 = **Tài**"
             ),
             color=discord.Color.random()
         )
         message = await ctx.send(embed=embed)
-
-        # (Sau khi xong có thể xóa msg1, msg2 nếu muốn)
-        
 
         for emoji in emojis:
             await message.add_reaction(emoji)
@@ -90,26 +84,46 @@ class TaiXiu(commands.Cog):
             ))
 
         choice = emojis[str(reaction.emoji)]
-        win = random.random() < (win_rate / 100)
 
+        # Lấy số trận thua liên tiếp
+        lose_streak = self.lose_streak.get(user_id, 0)
+        # Nếu thua >= 3 ván thì tăng win_rate dần theo cấp: 3 ván = 70%, 4 ván = 80%, >=5 ván = 90%
+        custom_win_rate = win_rate
+        if lose_streak == 3:
+            custom_win_rate = 70
+        elif lose_streak == 4:
+            custom_win_rate = 80
+        elif lose_streak >= 5:
+            custom_win_rate = 90
+        # Nếu đánh all in thì giảm 10% tỉ lệ thắng cuối cùng
+
+        # Quyết định thắng/thua
+        win = random.random() < (custom_win_rate / 100)
         if win:
-            result = random.randint(1, 9)
-            result = choice if result % 2 == 0 else ("xỉu" if choice == "tài" else "tài")
+            result = choice
         else:
-            result = "xỉu" if choice == "tài" else "tài"
+            result = "tài" if choice == "xỉu" else "xỉu"
 
-        def generate_dice_for(result):
+        def generate_dice_with_preview(preview, result):
+            # Random 2 con còn lại sao cho tổng 3 con đúng tài/xỉu
             while True:
-                dice = [random.randint(1, 6) for _ in range(3)]
+                dice2 = [random.randint(1, 6) for _ in range(2)]
+                dice = [preview] + dice2
                 total = sum(dice)
-                if ("tài" if 11 <= total <= 17 else "xỉu") == result:
+                if (result == "tài" and total > 10) or (result == "xỉu" and total <= 10):
                     return dice
 
-        dice = generate_dice_for(result)
+        dice = generate_dice_with_preview(dice_preview, result)
         total = sum(dice)
-
-        win_result = (choice == result)
+        result_real = "xỉu" if total <= 10 else "tài"
+        win_result = (choice == result_real)
         new_balance = balance + prize if win_result else balance - prize
+
+        # Cập nhật lose_streak
+        if win_result:
+            self.lose_streak[user_id] = 0
+        else:
+            self.lose_streak[user_id] = lose_streak + 1
 
         # Cập nhật database
         update_user_data(
@@ -118,7 +132,12 @@ class TaiXiu(commands.Cog):
             last_daily,
             streak,
             win_rate,
-            luck
+            luck,
+            so_ve,
+            hsd,
+            level,
+            exp,
+            invite
         )
 
         result_embed = discord.Embed(
@@ -129,6 +148,7 @@ class TaiXiu(commands.Cog):
         result_embed.add_field(name="🎲 Xúc xắc", value=f"`{' + '.join(map(str, dice))} = {total}`", inline=False)
         result_embed.add_field(name="📢 Kết quả", value=f"**{result.upper()}**", inline=True)
         result_embed.add_field(name="🧑‍💼 Người chơi", value=ctx.author.mention, inline=True)
+        result_embed.add_field(name="🔎 Bạn chọn", value=f"**{choice.upper()}**", inline=True)
         result_embed.add_field(
             name="🎉 Trạng thái",
             value="✅ Bạn **THẮNG**!" if win_result else "❌ Bạn **THUA**!",
@@ -138,7 +158,6 @@ class TaiXiu(commands.Cog):
 
         await message.edit(embed=result_embed)
         await msg1.delete()
-        await msg2.delete()
 
     @taixiu.error
     async def taixiu_error(self, ctx, error):

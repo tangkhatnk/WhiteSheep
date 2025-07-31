@@ -14,7 +14,7 @@ class CF(commands.Cog):
         user_data = get_user_data(user_id)
         if user_data is None:
             return await ctx.send("Bạn chưa có tài khoản. Hãy dùng lệnh đăng ký trước!")
-        balance, last_daily, streak, win_rate, luck = get_user_data(user_id)
+        balance, last_daily, streak, win_rate, luck, so_ve, hsd, level, exp, invite = user_data
         if amount is None or choice is None:
             return await ctx.send("Cú pháp: v.cf <số tiền> <heads/tails>")
         if amount <= 0:
@@ -33,7 +33,7 @@ class CF(commands.Cog):
         result = random.choice(["heads", "tails"])
         win = (user_choice == result)
         new_balance = balance + amount if win else balance - amount
-        update_user_data(user_id, new_balance, last_daily, streak, win_rate, luck)
+        update_user_data(user_id, new_balance, last_daily, streak, win_rate, luck, so_ve, hsd, level, exp, invite)
 
         # Soạn tin nhắn kết quả
         msg = f"{ctx.author.mention} spent 🧾 `{amount:,}` and chose **{user_choice}**\nThe coin spins... "
