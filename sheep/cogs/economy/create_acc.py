@@ -47,7 +47,7 @@ vui lòng gõ `accept` hoặc `decline`
 
                 if msg.content.lower() == 'accept':
                     # Tạo tài khoản mới nếu đồng ý
-                    create_user(user_id, 100, None, 0, 40, 0)
+                    create_user(user_id, 100, None, 0, 40, 0, 1, 0, 0)
                     await dm.send(f"Tạo tài khoản thành công!! Bạn được tặng `100` sheep coin")
                 elif msg.content.lower() == 'decline':
                     # Nếu từ chối

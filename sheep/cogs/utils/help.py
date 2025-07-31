@@ -9,7 +9,7 @@ class HelpPrefix(commands.Cog):
     async def help(self, ctx):
         embed = discord.Embed(
             title="**White 🤍 sheep** *help*",
-            description="**lệnh của cừu nè<3**\n **prefix** : `w.`",
+            description="**lệnh của cừu nè<3**\n **prefix** : `v.`",
             color=discord.Color.blue()
         )
 

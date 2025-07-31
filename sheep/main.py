@@ -1,3 +1,4 @@
+
 import discord
 import json
 from discord.ext import commands
@@ -21,13 +22,14 @@ cogs: list[str] = [
     "cogs.utils.help",
     "cogs.economy.create_acc",
     "cogs.economy.daily",
-    "cogs.economy.check",
     "cogs.economy.taixiu",
-    "cogs.economy.give",
-    "cogs.economy.topcoin",
     "cogs.economy.cf",
     "cogs.economy.luck",
     "cogs.economy.baucua",
+    "cogs.economy.xoso",
+    "cogs.economy.cash",
+    "cogs.sys.level",
+    "cogs.sys.invite",
 ]
 
 async def load_cogs() -> None:
@@ -42,7 +44,7 @@ async def load_cogs() -> None:
             
 @bot.event
 async def on_ready() -> None:
-    await load_cogs()
+    await load_cogs() 
     await bot.tree.sync()
     print(f'cừu {bot.user} đã lên')
     

@@ -1,8 +1,12 @@
 import discord
 from discord.ext import commands
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from database import get_user_data, update_user_data
+
+# Lấy ngày theo múi giờ Việt Nam
+VN_TZ = timezone(timedelta(hours=7))
+today = datetime.now(VN_TZ).date()
 
 class Daily(commands.Cog):
     def __init__(self, bot):
@@ -11,13 +15,13 @@ class Daily(commands.Cog):
     @commands.command(name="daily", description = "Nhận thưởng mỗi ngày")
     async def daily(self, ctx):
         user_id = ctx.author.id
-        today = datetime.utcnow().date()
+        # Sau đó dùng biến `today` này để so sánh và lưu ngày nhận daily.
 
         user_data = get_user_data(user_id)
         if user_data is None:
             await ctx.send("Bạn chưa có tài khoản. Hãy dùng lệnh đăng ký trước!")
             return
-        balance, last_daily, streak, win_rate, luck = user_data
+        balance, last_daily, streak, win_rate, luck, so_ve, hsd, level, exp, invite = user_data
         # Nếu chưa từng nhận hoặc lỗi định dạng thì reset
         try:
             last_claim_date = datetime.strptime(last_daily, "%Y-%m-%d").date() if last_daily else None
@@ -45,7 +49,7 @@ class Daily(commands.Cog):
         new_balance = balance + reward
 
         # Cập nhật DB
-        update_user_data(user_id, new_balance, today.strftime("%Y-%m-%d"), streak, win_rate, luck)
+        update_user_data(user_id, new_balance, today.strftime("%Y-%m-%d"), streak, win_rate, luck, so_ve, hsd, level, exp, invite)
 
         # Tạo embed đẹp
         embed = discord.Embed(
